@@ -20,6 +20,12 @@ constexpr double pi() { return M_PI; }
 double deg2rad(double x) { return x * pi() / 180; }
 double rad2deg(double x) { return x * 180 / pi(); }
 
+// have a reference velocity to target
+double ref_vel = 0; //mph
+
+// start in lane 1
+int lane = 1;
+
 // Checks if the SocketIO event has JSON data.
 // If there is data the JSON object in string format will be returned,
 // else the empty string "" will be returned.
@@ -164,6 +170,28 @@ vector<double> getXY(double s, double d, const vector<double> &maps_s, const vec
 
 }
 
+//Check the lane to see if it's clear
+bool laneIsClear(int lane, vector<vector<double>> sensor_fusion, double car_s, int prev_size, bool aheadOnly = false) {
+  for(int i = 0; i < sensor_fusion.size(); i++) {
+    float d = sensor_fusion[i][6];
+    if(d < (2 + 4 * lane + 2) && d > (2 + 4 * lane - 2) ) {
+      //car is in lane
+      double vx = sensor_fusion[i][3];
+      double vy = sensor_fusion[i][4];
+      double check_speed = sqrt(vx * vx + vy * vy);
+      double check_car_s = sensor_fusion[i][5];
+      
+      // if using previous points, we can project s value outwards in time
+      check_car_s += ((double)prev_size * .02 * check_speed);
+      //check s values greater than mine and s gap
+      if( (abs(check_car_s - car_s) < 30) && (!aheadOnly || check_car_s > car_s)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 int main() {
   uWS::Hub h;
 
@@ -238,16 +266,41 @@ int main() {
 
           // Sensor Fusion Data, a list of all other cars on the same side of the road.
           auto sensor_fusion = j[1]["sensor_fusion"];
-        
+          
           int prev_size = previous_path_x.size();
+          
+          // Dont' hit car in front of us
+          
+          if(prev_size > 0) {
+            car_s = end_path_s;
+          }
+          
+          bool too_close = !laneIsClear(lane, sensor_fusion, car_s, prev_size, true);
+          
+          // try to change lanes if we're too close to the car in front of us
+          if(too_close) {
+            if (lane > 0 && laneIsClear(lane - 1, sensor_fusion, car_s, prev_size)) {
+              // go left
+              lane -= 1;
+              too_close = false;
+            } else if (lane < 2 && laneIsClear(lane + 1, sensor_fusion, car_s, prev_size)) {
+              // go right
+              lane += 1;
+              too_close = false;
+            }
+          }
+          
+          // adjust speed slowly
+          if(too_close) {
+            ref_vel -= .224;
+          } else if(ref_vel < 49.5) {
+            ref_vel += .224;
+          }
 
           json msgJson;
-
-          // start in lane 1
-          int lane = 1;
           
-          // have a reference velocity to target
-          double ref_vel = 49.5; //mph
+          // create a list of widely spaced (x,y) waypoints, evenly spaced at 30m
+          // later we will interpolate these waypoints with a spline and fill it in with more points that control speed
           
           vector<double> ptsx;
           vector<double> ptsy;
