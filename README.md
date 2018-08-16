@@ -1,7 +1,18 @@
 # CarND-Path-Planning-Project
 Self-Driving Car Engineer Nanodegree Program
-   
-### Simulator.
+
+### Reflection
+Making the car travel around the track in a smooth manner and pass when senseable turned out to be a challenging but ultimately straight forward problem.  I began with the starter code example from the classroom to make the car travel in a straight line.  This enabled me to get the build environment up and running and confirm that everything was working with the simulator and the communication between the program and the simulator.
+
+Next, I worked through the walk-through that was included in the classroom.  I implemented the approaches discussed by David and Aaron.  Specifically, I began by simply using Frenet d values to get the car to follow a specified lane in the road instead of driving in a straight line.  This worked, but was way too jerky (both laterally and longitudinally) due to the Frenet points not being evenly spaced.  To solve this, I specified evenly spaced s values (30m apart) along the route and used the recommended spline library (http://kluge.in-chemnitz.de/opensource/spline) to create paths for car to follow.  This solved the lateral (and given a constant speed, the longitudinal) jerk problem.
+
+There was still a longitudinal jerk problem that occured when a change in speed happened too quickly.  This was easily resolved, as Aaron suggested, by limiting the change in speed to +/- .224 mph per cycle (i.e. each message from the simulator).
+
+Finally, I addressed both the problems of running into slower cars in the same lane and determining when it's safe to switch lanes by creating a function to determin when a lane is clear (code: line 174-193).  This function iterates through all the cars identified in the sensor fusion data and uses each detected car's speed and our path to determine if the car will be too close, defined as < 30 meters.  On each cycle, I first call this function to determine whether the current lane is clear.  If it is not, I use the same function to determine whether an adjacent lane is clear.  If an adjacent lane is clear, the car changes to that lane to pass.  If not, it slows down to avoid colliding with the car in the current lane.
+
+There are some optimizations that could be made.  For example, the car first trys to pass left and then right.  An alternative would be to see which lane is clear futher away.  However, it is questionable which behavior would be preferable because passing is generally supposed to occur to the left when possible, and this approach worked fairly well in testing.
+
+### Simulator
 You can download the Term3 Simulator which contains the Path Planning Project from the [releases tab (https://github.com/udacity/self-driving-car-sim/releases/tag/T3_v1.2).
 
 ### Goals
